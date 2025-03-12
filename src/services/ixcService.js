@@ -52,7 +52,7 @@ async function buscarLoginPPPoE(clienteId) {
       const registro = response.data.registros[0];
       return {
         login: registro.login,
-        mac: registro.onu_mac || registro.mac || "N/A", // Prioriza onu_mac, mas fallback para mac
+        mac: registro.onu_mac || registro.mac || "N/A",
       };
     }
     return { login: null, mac: "N/A" };
@@ -80,7 +80,7 @@ async function validarCentralAssinante(cpf, senha) {
       nome: cliente.razao,
       cpf: cliente.cnpj_cpf,
       loginPPPoE: login || "N/A",
-      mac: mac, // Adiciona o MAC ao cliente validado
+      mac: mac,
       senha: cliente.senha,
     };
     console.log("Cliente validado:", clienteValidado);
@@ -96,18 +96,16 @@ async function listarEquipamentosFibra(clienteId, loginPPPoE) {
   console.log("Iniciando listarEquipamentosFibra com clienteId:", clienteId, "e loginPPPoE:", loginPPPoE);
 
   try {
-    // Busca novamente os dados de /radusuarios para garantir consistência
     const { login, mac } = await buscarLoginPPPoE(clienteId);
     console.log("Dados encontrados em /radusuarios:", { login, mac });
 
     if (login && mac !== "N/A") {
-      // Retorna o equipamento diretamente a partir de /radusuarios
       const equipamento = {
-        id: "N/A", // Pode ser ajustado se houver um ID específico
+        id: "N/A",
         login: login,
         mac: mac,
-        tipo: "Fibra", // Valor fixo ou ajustável conforme necessidade
-        status: "Ativo", // Valor fixo ou ajustável
+        tipo: "Fibra",
+        status: "Ativo",
       };
       console.log("Equipamento encontrado:", equipamento);
       return [equipamento];
@@ -126,4 +124,87 @@ async function listarEquipamentosFibra(clienteId, loginPPPoE) {
   }
 }
 
-module.exports = { buscarClientePorCPF, validarCentralAssinante, listarEquipamentosFibra };
+async function listarFaturasPorCliente(clienteId) {
+  let allFaturas = [];
+  let page = 1;
+  const rp = 100;
+
+  try {
+    while (true) {
+      const jsonData = {
+        qtype: "fn_areceber.id_cliente",
+        query: clienteId,
+        oper: "=",
+        page: page.toString(),
+        rp: rp.toString(),
+        sortname: "fn_areceber.id",
+        sortorder: "desc",
+      };
+
+      const response = await axios.post(`${API_URL}/fn_areceber`, jsonData, { headers });
+      const data = response.data;
+
+      if (!data.registros || data.registros.length === 0) break;
+
+      allFaturas = allFaturas.concat(data.registros);
+      if (allFaturas.length >= parseInt(data.total)) break;
+
+      page++;
+    }
+
+    return allFaturas.map(fatura => ({
+      id: fatura.id,
+      dataEmissao: fatura.data_emissao,
+      dataVencimento: fatura.data_vencimento,
+      valor: fatura.valor,
+      status: fatura.status === "A" ? "Aberto" : "Fechado",
+      linhaDigitavel: fatura.linha_digitavel || "N/A",
+    }));
+  } catch (error) {
+    console.error("Erro ao listar faturas:", error.response?.data || error.message);
+    throw error;
+  }
+}
+
+async function gerarBoleto(idFatura) {
+  const jsonData = {
+    boletos: idFatura,
+    juro: "",
+    multa: "",
+    atualiza_boleto: "",
+    tipo_boleto: "arquivo",
+    base64: "S",
+    layout_impressao: "",
+  };
+
+  try {
+    const response = await axios.post(`${API_URL}/get_boleto`, jsonData, { headers });
+    const boletoData = response.data;
+
+    let base64String;
+    if (typeof boletoData === "string") {
+      base64String = boletoData;
+    } else if (boletoData && boletoData.boleto) {
+      base64String = boletoData.boleto;
+    } else {
+      throw new Error("Boleto não retornado pela API");
+    }
+
+    if (!base64String.startsWith("JVBERi")) {
+      throw new Error("Retorno não é um PDF válido");
+    }
+
+    return Buffer.from(base64String, "base64");
+  } catch (error) {
+    console.error("Erro ao gerar boleto:", error.response?.data || error.message);
+    throw error;
+  }
+}
+
+module.exports = { 
+  buscarClientePorCPF, 
+  validarCentralAssinante, 
+  listarEquipamentosFibra, 
+  listarFaturasPorCliente, 
+  gerarBoleto 
+};
