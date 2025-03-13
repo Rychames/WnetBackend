@@ -87,7 +87,7 @@ async function validarCentralAssinante(cpf, senha) {
 
     return clienteValidado;
   } catch (error) {
-    console.error("Erro ao validar na Central do Assinante:", error);
+    console.error("Erro ao validar na Central do Assinante:", error.message || error);
     throw error;
   }
 }
@@ -201,10 +201,44 @@ async function gerarBoleto(idFatura) {
   }
 }
 
+async function gerarPix(idFatura) {
+  const jsonData = {
+    id_areceber: idFatura,
+  };
+
+  try {
+    console.log(`Gerando PIX para fatura ${idFatura} com dados:`, jsonData);
+    const response = await axios.post(`${API_URL}/pix`, jsonData, { headers });
+    const pixData = response.data;
+
+    console.log("Resposta da API PIX:", pixData);
+
+    if (!pixData || pixData.type !== "success" || !pixData.pix) {
+      throw new Error(`Erro ao gerar PIX: Resposta inválida - ${JSON.stringify(pixData)}`);
+    }
+
+    const pixResponse = {
+      chave: pixData.pix.qrCode.qrcode,
+      qrCodeBase64: pixData.pix.qrCode.imagemQrcode,
+    };
+
+    console.log("PIX gerado com sucesso:", pixResponse);
+    return pixResponse;
+  } catch (error) {
+    console.error("Erro ao gerar PIX para fatura", idFatura, ":", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+    throw new Error(`Erro ao gerar PIX: ${error.response?.data?.message || error.message}`);
+  }
+}
+
 module.exports = { 
   buscarClientePorCPF, 
   validarCentralAssinante, 
   listarEquipamentosFibra, 
   listarFaturasPorCliente, 
-  gerarBoleto 
+  gerarBoleto,
+  gerarPix,
 };
