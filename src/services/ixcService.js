@@ -208,7 +208,7 @@ async function gerarPix(idFatura) {
 
   try {
     console.log(`Gerando PIX para fatura ${idFatura} com dados:`, jsonData);
-    const response = await axios.post(`${API_URL}/pix`, jsonData, { headers });
+    const response = await axios.post(`${API_URL}/get_pix`, jsonData, { headers });
     const pixData = response.data;
 
     console.log("Resposta da API PIX:", pixData);
