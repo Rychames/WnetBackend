@@ -1,4 +1,5 @@
 const axios = require("axios");
+const QRCode = require("qrcode"); // Biblioteca para gerar o QR Code
 const { API_URL, API_KEY } = require("../config/config");
 
 const headers = {
@@ -217,9 +218,17 @@ async function gerarPix(idFatura) {
       throw new Error(`Erro ao gerar PIX: Resposta inválida - ${JSON.stringify(pixData)}`);
     }
 
+    // Gere o QR Code como PNG em Base64 a partir da chave PIX
+    const qrCodeBase64 = await QRCode.toDataURL(pixData.pix.qrCode.qrcode, {
+      type: "image/png",
+      margin: 1,
+      width: 250, // Tamanho compatível com o app
+    });
+    const base64Image = qrCodeBase64.split(',')[1]; // Remove o prefixo "data:image/png;base64,"
+
     const pixResponse = {
       chave: pixData.pix.qrCode.qrcode,
-      qrCodeBase64: pixData.pix.qrCode.imagemQrcode,
+      qrCodeBase64: base64Image,
     };
 
     console.log("PIX gerado com sucesso:", pixResponse);
