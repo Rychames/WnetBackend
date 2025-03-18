@@ -28,7 +28,7 @@ async function login(req, res) {
       cpf: cliente.cpf, 
       loginPPPoE: cliente.loginPPPoE 
     };
-    console.log("Payload do token:", tokenPayload); // Log para verificar o payload
+    console.log("Payload do token:", tokenPayload);
 
     const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: "8h" });
 

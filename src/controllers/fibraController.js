@@ -20,7 +20,7 @@ async function getEquipamentosFibra(req, res) {
     const equipamentosFormatados = equipamentos.map(equip => {
       const formatted = {
         id: equip.id,
-        mac: equip.mac || equip.serial || equip.mac_address || equip.onu_mac || "N/A", // Ajustado para cobrir possíveis campos
+        mac: equip.mac || equip.serial || equip.mac_address || equip.onu_mac || "N/A",
         login: equip.login || "N/A",
         tipo: equip.tipo || "Desconhecido",
         status: equip.status || "N/A",
@@ -35,7 +35,7 @@ async function getEquipamentosFibra(req, res) {
       equipamentos: equipamentosFormatados,
     });
   } catch (error) {
-    console.error("Erro em getEquipamentosFibra:", error);
+    console.error("Erro em getEquipamentosFibra:", error.message || error);
     res.status(500).json({
       success: false,
       message: "Erro interno ao buscar equipamentos",

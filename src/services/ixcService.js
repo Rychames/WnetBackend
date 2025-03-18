@@ -1,5 +1,5 @@
 const axios = require("axios");
-const QRCode = require("qrcode"); // Biblioteca para gerar o QR Code
+const QRCode = require("qrcode");
 const { API_URL, API_KEY } = require("../config/config");
 
 const headers = {
@@ -153,14 +153,30 @@ async function listarFaturasPorCliente(clienteId) {
       page++;
     }
 
-    return allFaturas.map(fatura => ({
-      id: fatura.id,
-      dataEmissao: fatura.data_emissao,
-      dataVencimento: fatura.data_vencimento,
-      valor: fatura.valor,
-      status: fatura.status === "A" ? "Aberto" : "Fechado",
-      linhaDigitavel: fatura.linha_digitavel || "N/A",
-    }));
+    const dataAtual = new Date();
+    return allFaturas.map(fatura => {
+      const dataVencimento = new Date(fatura.data_vencimento);
+      let statusFatura;
+
+      if (fatura.status === "R") {
+        statusFatura = "Fechado";
+      } else if (fatura.status === "A" && dataVencimento < dataAtual) {
+        statusFatura = "Atrasado";
+      } else if (fatura.status === "A") {
+        statusFatura = "Aberto";
+      } else {
+        statusFatura = "Aberto";
+      }
+
+      return {
+        id: fatura.id,
+        dataEmissao: fatura.data_emissao,
+        dataVencimento: fatura.data_vencimento,
+        valor: fatura.valor,
+        status: statusFatura,
+        linhaDigitavel: fatura.linha_digitavel || null,
+      };
+    });
   } catch (error) {
     console.error("Erro ao listar faturas:", error.response?.data || error.message);
     throw error;
@@ -172,13 +188,14 @@ async function gerarBoleto(idFatura) {
     boletos: idFatura,
     juro: "",
     multa: "",
-    atualiza_boleto: "",
+    atualiza_boleto: "S", // Forçar atualização para garantir segunda via
     tipo_boleto: "arquivo",
     base64: "S",
     layout_impressao: "",
   };
 
   try {
+    console.log(`Gerando boleto para fatura ${idFatura}`);
     const response = await axios.post(`${API_URL}/get_boleto`, jsonData, { headers });
     const boletoData = response.data;
 
@@ -188,17 +205,19 @@ async function gerarBoleto(idFatura) {
     } else if (boletoData && boletoData.boleto) {
       base64String = boletoData.boleto;
     } else {
-      throw new Error("Boleto não retornado pela API");
+      console.warn(`Nenhum PDF retornado para fatura ${idFatura}`);
+      return null;
     }
 
     if (!base64String.startsWith("JVBERi")) {
-      throw new Error("Retorno não é um PDF válido");
+      console.warn(`Retorno para fatura ${idFatura} não é um PDF válido`);
+      return null;
     }
 
     return Buffer.from(base64String, "base64");
   } catch (error) {
-    console.error("Erro ao gerar boleto:", error.response?.data || error.message);
-    throw error;
+    console.error(`Erro ao gerar boleto para fatura ${idFatura}:`, error.response?.data || error.message);
+    return null;
   }
 }
 
@@ -215,31 +234,24 @@ async function gerarPix(idFatura) {
     console.log("Resposta da API PIX:", pixData);
 
     if (!pixData || pixData.type !== "success" || !pixData.pix) {
-      throw new Error(`Erro ao gerar PIX: Resposta inválida - ${JSON.stringify(pixData)}`);
+      console.warn(`PIX não disponível para fatura ${idFatura}`);
+      return null;
     }
 
-    // Gere o QR Code como PNG em Base64 a partir da chave PIX
     const qrCodeBase64 = await QRCode.toDataURL(pixData.pix.qrCode.qrcode, {
       type: "image/png",
       margin: 1,
-      width: 250, // Tamanho compatível com o app
+      width: 250,
     });
-    const base64Image = qrCodeBase64.split(',')[1]; // Remove o prefixo "data:image/png;base64,"
+    const base64Image = qrCodeBase64.split(',')[1];
 
-    const pixResponse = {
+    return {
       chave: pixData.pix.qrCode.qrcode,
       qrCodeBase64: base64Image,
     };
-
-    console.log("PIX gerado com sucesso:", pixResponse);
-    return pixResponse;
   } catch (error) {
-    console.error("Erro ao gerar PIX para fatura", idFatura, ":", {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-    });
-    throw new Error(`Erro ao gerar PIX: ${error.response?.data?.message || error.message}`);
+    console.error(`Erro ao gerar PIX para fatura ${idFatura}:`, error.response?.data || error.message);
+    return null;
   }
 }
 

@@ -8,17 +8,10 @@ async function getFaturas(req, res) {
     const faturas = await listarFaturasPorCliente(clienteId);
     console.log("Faturas encontradas:", faturas);
 
-    if (faturas.length === 0) {
-      return res.status(200).json({
-        success: true,
-        faturas: [],
-        message: "Nenhuma fatura encontrada para este cliente",
-      });
-    }
-
     res.status(200).json({
       success: true,
-      faturas,
+      faturas: faturas.length > 0 ? faturas : [],
+      message: faturas.length === 0 ? "Nenhuma fatura encontrada para este cliente" : undefined,
     });
   } catch (error) {
     console.error("Erro em getFaturas:", error.message || error);
@@ -38,42 +31,54 @@ async function getBoleto(req, res) {
     const faturas = await listarFaturasPorCliente(clienteId);
     const fatura = faturas.find(f => f.id === idFatura);
     if (!fatura) {
-      return res.status(403).json({
+      return res.status(404).json({
         success: false,
-        message: "Você não tem permissão para acessar este boleto ou ele não existe",
+        message: "Fatura não encontrada ou você não tem permissão para acessá-la",
       });
     }
 
+    // Gerar PDF (segunda via)
+    let pdfBase64 = null;
     const pdfBuffer = await gerarBoleto(idFatura);
-    const pdfBase64 = pdfBuffer.toString("base64");
-
-    let pixData = null;
-    if (fatura.status === "Aberto") { // Só gerar PIX para faturas abertas
-      try {
-        pixData = await gerarPix(idFatura);
-      } catch (pixError) {
-        console.warn(`PIX não gerado para fatura ${idFatura}: ${pixError.message}`);
-        pixData = null; // Continuar mesmo com erro no PIX
-      }
-    } else {
-      console.log(`Fatura ${idFatura} está fechada, não gerando PIX`);
+    if (pdfBuffer) {
+      pdfBase64 = pdfBuffer.toString("base64");
     }
 
-    res.status(200).json({
+    // Gerar PIX e QR Code
+    let pixData = null;
+    pixData = await gerarPix(idFatura);
+
+    // Código de barras (linha digitável)
+    const codigoBarras = fatura.linhaDigitavel;
+
+    // Montar resposta
+    const responseData = {
       success: true,
       data: {
         boleto_id: idFatura,
         pdf: pdfBase64,
         pix: pixData,
-        codigo_barras: fatura.linhaDigitavel !== "N/A" ? fatura.linhaDigitavel : null,
+        codigo_barras: codigoBarras,
       },
       message: "Dados do boleto gerados com sucesso",
-    });
+    };
+
+    // Ajustar mensagem se algum dado estiver faltando
+    if (!pdfBase64 && !pixData && !codigoBarras) {
+      responseData.success = false;
+      responseData.message = "Nenhum dado disponível para esta fatura";
+    } else {
+      if (!pdfBase64) responseData.message += " (PDF não disponível)";
+      if (!pixData) responseData.message += " (PIX não disponível)";
+      if (!codigoBarras) responseData.message += " (Código de barras não disponível)";
+    }
+
+    res.status(200).json(responseData);
   } catch (error) {
     console.error("Erro em getBoleto:", error.message || error);
-    res.status(error.message === "Retorno não é um PDF válido" ? 400 : 500).json({
+    res.status(500).json({
       success: false,
-      message: error.message || "Erro interno ao gerar boleto",
+      message: "Erro interno ao gerar boleto",
     });
   }
 }
