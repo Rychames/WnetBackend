@@ -138,8 +138,8 @@ async function listarFaturasPorCliente(clienteId) {
         oper: "=",
         page: page.toString(),
         rp: rp.toString(),
-        sortname: "fn_areceber.id",
-        sortorder: "desc",
+        sortname: "fn_areceber.data_vencimento",
+        sortorder: "asc", // Ordem ascendente para priorizar próximas vencimentos
       };
 
       const response = await axios.post(`${API_URL}/fn_areceber`, jsonData, { headers });
@@ -153,8 +153,11 @@ async function listarFaturasPorCliente(clienteId) {
       page++;
     }
 
-    const dataAtual = new Date();
-    return allFaturas.map(fatura => {
+    const dataAtual = new Date(); // 18/03/2025
+    const mesAtual = dataAtual.getMonth(); // 2 (março)
+    const anoAtual = dataAtual.getFullYear(); // 2025
+
+    const faturasMapeadas = allFaturas.map(fatura => {
       const dataVencimento = new Date(fatura.data_vencimento);
       let statusFatura;
 
@@ -177,6 +180,30 @@ async function listarFaturasPorCliente(clienteId) {
         linhaDigitavel: fatura.linha_digitavel || null,
       };
     });
+
+    // Filtrar fatura do mês atual (março de 2025)
+    const faturaMesAtual = faturasMapeadas.find(fatura => {
+      const vencimento = new Date(fatura.dataVencimento);
+      return vencimento.getMonth() === mesAtual && vencimento.getFullYear() === anoAtual;
+    });
+
+    // Ordenar: 
+    // 1. Fatura do mês atual (se existir)
+    // 2. Próxima fatura a vencer (ordem ascendente)
+    // 3. Demais faturas em ordem ascendente
+    const faturasOrdenadas = faturasMapeadas.sort((a, b) => {
+      const dataA = new Date(a.dataVencimento);
+      const dataB = new Date(b.dataVencimento);
+
+      // Priorizar fatura do mês atual
+      if (faturaMesAtual && a.id === faturaMesAtual.id) return -1;
+      if (faturaMesAtual && b.id === faturaMesAtual.id) return 1;
+
+      // Ordenar por data de vencimento ascendente
+      return dataA - dataB;
+    });
+
+    return faturasOrdenadas;
   } catch (error) {
     console.error("Erro ao listar faturas:", error.response?.data || error.message);
     throw error;
@@ -188,7 +215,7 @@ async function gerarBoleto(idFatura) {
     boletos: idFatura,
     juro: "",
     multa: "",
-    atualiza_boleto: "S", // Forçar atualização para garantir segunda via
+    atualiza_boleto: "S",
     tipo_boleto: "arquivo",
     base64: "S",
     layout_impressao: "",
