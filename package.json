@@ -15,9 +15,6 @@
     "jsonwebtoken": "^9.0.2",
     "qrcode": "^1.5.4"
   },
-  "devDependencies": {
-    "nodemon": "^3.0.0"
-  },
   "engines": {
     "node": "18.x"
   }
