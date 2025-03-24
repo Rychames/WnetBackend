@@ -26,7 +26,8 @@ async function login(req, res) {
       id: cliente.id, 
       nome: cliente.nome, 
       cpf: cliente.cpf, 
-      loginPPPoE: cliente.loginPPPoE 
+      loginPPPoE: cliente.loginPPPoE,
+      mac: cliente.mac  // Adicionar o MAC ao token
     };
     console.log("Payload do token:", tokenPayload);
 
@@ -39,7 +40,8 @@ async function login(req, res) {
         id: cliente.id,
         nome: cliente.nome,
         cpf: cliente.cpf,
-        loginPPPoE: cliente.loginPPPoE
+        loginPPPoE: cliente.loginPPPoE,
+        mac: cliente.mac  // Incluir na resposta
       }
     });
   } catch (error) {
