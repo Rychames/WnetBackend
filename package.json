@@ -1,5 +1,5 @@
 {
-  "name": "meu-backend",
+  "name": "WnetBackend",
   "version": "1.0.0",
   "description": "Backend Express hospedado no Railway",
   "main": "server.js",
