@@ -24,8 +24,8 @@ async function buscarClientePorCPF(cpf) {
     const response = await axios.post(`${API_URL}/cliente`, jsonData, { headers });
     console.log("Resposta do IXC para buscarClientePorCPF:", response.data);
 
-    return response.data.registros && response.data.registros.length > 0 
-      ? response.data.registros[0] 
+    return response.data.registros && response.data.registros.length > 0
+      ? response.data.registros[0]
       : null;
   } catch (error) {
     console.error("Erro ao buscar cliente no IXC:", error.response?.data || error.message);
@@ -53,7 +53,7 @@ async function buscarLoginPPPoE(clienteId) {
       const registro = response.data.registros[0];
       return {
         login: registro.login,
-        mac: registro.onu_mac || registro.mac || "N/A",
+        mac: registro.onu_mac || registro.mac || "N/A", // Prioriza 'onu_mac'
       };
     }
     return { login: null, mac: "N/A" };
@@ -139,7 +139,7 @@ async function listarFaturasPorCliente(clienteId) {
         page: page.toString(),
         rp: rp.toString(),
         sortname: "fn_areceber.data_vencimento",
-        sortorder: "asc", // Ordem ascendente para priorizar próximas vencimentos
+        sortorder: "asc",
       };
 
       const response = await axios.post(`${API_URL}/fn_areceber`, jsonData, { headers });
@@ -153,11 +153,11 @@ async function listarFaturasPorCliente(clienteId) {
       page++;
     }
 
-    const dataAtual = new Date(); // 18/03/2025
-    const mesAtual = dataAtual.getMonth(); // 2 (março)
-    const anoAtual = dataAtual.getFullYear(); // 2025
+    const dataAtual = new Date();
+    const mesAtual = dataAtual.getMonth();
+    const anoAtual = dataAtual.getFullYear();
 
-    const faturasMapeadas = allFaturas.map(fatura => {
+    const faturasMapeadas = allFaturas.map((fatura) => {
       const dataVencimento = new Date(fatura.data_vencimento);
       let statusFatura;
 
@@ -181,25 +181,18 @@ async function listarFaturasPorCliente(clienteId) {
       };
     });
 
-    // Filtrar fatura do mês atual (março de 2025)
-    const faturaMesAtual = faturasMapeadas.find(fatura => {
+    const faturaMesAtual = faturasMapeadas.find((fatura) => {
       const vencimento = new Date(fatura.dataVencimento);
       return vencimento.getMonth() === mesAtual && vencimento.getFullYear() === anoAtual;
     });
 
-    // Ordenar: 
-    // 1. Fatura do mês atual (se existir)
-    // 2. Próxima fatura a vencer (ordem ascendente)
-    // 3. Demais faturas em ordem ascendente
     const faturasOrdenadas = faturasMapeadas.sort((a, b) => {
       const dataA = new Date(a.dataVencimento);
       const dataB = new Date(b.dataVencimento);
 
-      // Priorizar fatura do mês atual
       if (faturaMesAtual && a.id === faturaMesAtual.id) return -1;
       if (faturaMesAtual && b.id === faturaMesAtual.id) return 1;
 
-      // Ordenar por data de vencimento ascendente
       return dataA - dataB;
     });
 
@@ -270,7 +263,7 @@ async function gerarPix(idFatura) {
       margin: 1,
       width: 250,
     });
-    const base64Image = qrCodeBase64.split(',')[1];
+    const base64Image = qrCodeBase64.split(",")[1];
 
     return {
       chave: pixData.pix.qrCode.qrcode,
@@ -282,11 +275,11 @@ async function gerarPix(idFatura) {
   }
 }
 
-module.exports = { 
-  buscarClientePorCPF, 
-  validarCentralAssinante, 
-  listarEquipamentosFibra, 
-  listarFaturasPorCliente, 
+module.exports = {
+  buscarClientePorCPF,
+  validarCentralAssinante,
+  listarEquipamentosFibra,
+  listarFaturasPorCliente,
   gerarBoleto,
   gerarPix,
 };
