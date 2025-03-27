@@ -36,7 +36,7 @@ async function login(req, res) {
         equipmentName = modelData.model !== "Unknown" ? modelData.model : "Unknown";
         wifiConfig = await getWifiConfig(deviceResult);
       } else {
-        console.log(`Dispositivo não encontrado para MAC ${cliente.mac}`);
+        console.log(`Nenhum dispositivo encontrado para MAC ${cliente.mac}`);
       }
     }
 

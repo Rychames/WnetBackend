@@ -33,6 +33,11 @@ async function buscarClientePorCPF(cpf) {
   }
 }
 
+function isValidOnuMac(mac) {
+  // Aceita 8 ou 12 caracteres alfanuméricos (sem separadores)
+  return mac && /^[A-Z0-9]{8,12}$/i.test(mac.replace(/:/g, ""));
+}
+
 async function buscarLoginPPPoE(clienteId) {
   try {
     const jsonData = {
@@ -51,15 +56,27 @@ async function buscarLoginPPPoE(clienteId) {
 
     if (response.data.registros && response.data.registros.length > 0) {
       const registro = response.data.registros[0];
+      const onuMac = registro.onu_mac;
+      const traditionalMac = registro.mac;
+
+      let mac;
+      if (onuMac && isValidOnuMac(onuMac)) {
+        mac = onuMac;
+        console.log(`MAC selecionado: ${mac} (usando onu_mac)`);
+      } else {
+        mac = "Cliente sem equipamento associado - Entre em contato com a central";
+        console.warn(`Aviso: onu_mac não preenchido ou inválido para clienteId ${clienteId}. (mac tradicional: ${traditionalMac || "não disponível"})`);
+      }
+
       return {
         login: registro.login,
-        mac: registro.onu_mac || registro.mac || "N/A", // Prioriza 'onu_mac'
+        mac: mac,
       };
     }
-    return { login: null, mac: "N/A" };
+    return { login: null, mac: "Cliente sem equipamento associado - Entre em contato com a central" };
   } catch (error) {
     console.error("Erro ao buscar login PPPoE no IXC:", error.response?.data || error.message);
-    return { login: null, mac: "N/A" };
+    return { login: null, mac: "Cliente sem equipamento associado - Entre em contato com a central" };
   }
 }
 
@@ -100,7 +117,7 @@ async function listarEquipamentosFibra(clienteId, loginPPPoE) {
     const { login, mac } = await buscarLoginPPPoE(clienteId);
     console.log("Dados encontrados em /radusuarios:", { login, mac });
 
-    if (login && mac !== "N/A") {
+    if (login && mac !== "Cliente sem equipamento associado - Entre em contato com a central") {
       const equipamento = {
         id: "N/A",
         login: login,
@@ -111,7 +128,7 @@ async function listarEquipamentosFibra(clienteId, loginPPPoE) {
       console.log("Equipamento encontrado:", equipamento);
       return [equipamento];
     } else {
-      console.log("Nenhum MAC encontrado em /radusuarios para clienteId:", clienteId);
+      console.log("Nenhum equipamento associado para clienteId:", clienteId);
     }
 
     return [];
